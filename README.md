@@ -1,6 +1,6 @@
 # Neural Baby Talk
 
-This is FDU nndl pj3, and I reproduced Neural Baby Talk for novel object captioning.
+This is FDU nndl pj3, and I reproduced Neural Baby Talk for novel object captioning. Thanks to [@Jiasen Lu](https://github.com/jiasenlu) for his paper and his original implementation in python 2.7.
 
 Here is the results:
 
