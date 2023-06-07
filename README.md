@@ -16,6 +16,8 @@ Here is the results:
 Inference:
 Python 3.6 is used. Please refer to `requirements.txt` for the required packages.
 
+For more details about environment configuration, you can refer to [here](https://blog.csdn.net/weixin_50833696/article/details/125186900).
+
 Data Preparation:
 
 - [stanford-corenlp](https://stanfordnlp.github.io/CoreNLP/)
