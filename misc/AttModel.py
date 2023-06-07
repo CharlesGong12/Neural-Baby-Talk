@@ -31,7 +31,7 @@ class Attention(nn.Module):
         att_h = self.h2att(h)                        # batch * att_hid_size
         att_h = att_h.unsqueeze(1).expand_as(att)            # batch * att_size * att_hid_size
         dot = att + att_h                                # batch * att_size * att_hid_size
-        dot = F.tanh(dot)                              # batch * att_size * att_hid_size
+        dot = torch.tanh(dot)                              # batch * att_size * att_hid_size
         dot = dot.view(-1, self.att_hid_size)               # (batch * att_size) * att_hid_size
         # dot = F.dropout(dot, 0.3, training=self.training)
         dot = self.alpha_net(dot)                           # (batch * att_size) * 1
@@ -65,11 +65,12 @@ class Attention2(nn.Module):
         att_h = self.h2att(h)                        # batch * att_hid_size
         att_h = att_h.unsqueeze(1).expand_as(att)            # batch * att_size * att_hid_size
         dot = att + att_h                                # batch * att_size * att_hid_size
-        dot = F.tanh(dot)                              # batch * att_size * att_hid_size
+        dot = torch.tanh(dot)                              # batch * att_size * att_hid_size
         dot = dot.view(-1, self.att_hid_size)               # (batch * att_size) * att_hid_size
         # dot = F.dropout(dot, 0.3, training=self.training)
         hAflat = self.alpha_net(dot)                           # (batch * att_size) * 1
         hAflat = hAflat.view(-1, att_size)                        # batch * att_size
+        mask=mask.to(torch.bool)
         hAflat.masked_fill_(mask, self.min_value)
         
         weight = F.softmax(hAflat, dim=1)                             # batch * att_size
@@ -110,10 +111,11 @@ class adaPnt(nn.Module):
         h_out_embed = self.h_fc1(h_out)
         # img_all = torch.cat([fake_region.view(-1,1,self.conv_size), conv_feat], 1)
         img_all_embed = torch.cat([fake_region_embed.view(-1,1,self.att_hid_size), conv_feat_embed], 1)
-        hA = F.tanh(img_all_embed + h_out_embed.view(-1,1,self.att_hid_size))
+        hA = torch.tanh(img_all_embed + h_out_embed.view(-1,1,self.att_hid_size))
         # hA = F.dropout(hA, 0.3, self.training)
         hAflat = self.alpha_net(hA.view(-1, self.att_hid_size))
         hAflat = hAflat.view(-1, roi_num + 1)
+        mask = mask.to(torch.bool) 
         hAflat.masked_fill_(mask, self.min_value)
         # det_prob = F.log_softmax(hAflat, dim=1)
         return hAflat
@@ -145,10 +147,10 @@ class TopDownCore(nn.Module):
         att2 = self.attention2(h_att, pool_feats, p_pool_feats, att_mask[:,1:])
         lang_lstm_input = torch.cat([att+att2, h_att], 1)
 
-        ada_gate_point = F.sigmoid(self.i2h_2(lang_lstm_input) + self.h2h_2(state[0][1]))
+        ada_gate_point = torch.sigmoid(self.i2h_2(lang_lstm_input) + self.h2h_2(state[0][1]))
         h_lang, c_lang = self.lang_lstm(lang_lstm_input, (state[0][1], state[1][1]))
         output = F.dropout(h_lang, self.drop_prob_lm, self.training)
-        fake_box = F.dropout(ada_gate_point*F.tanh(state[1][1]), self.drop_prob_lm, training=self.training)
+        fake_box = F.dropout(ada_gate_point*torch.tanh(state[1][1]), self.drop_prob_lm, training=self.training)
         det_prob = self.adaPnt(output, fake_box, pool_feats, p_pool_feats, pnt_mask)
         state = (torch.stack([h_att, h_lang]), torch.stack([c_att, c_lang]))
         return output, det_prob, state
@@ -184,7 +186,7 @@ class Att2in2Core(nn.Module):
         # xt_input = torch.cat([fc_feats, xt], 1)
         all_input_sums = self.i2h(xt) + self.h2h(state[0][-1])
         sigmoid_chunk = all_input_sums.narrow(1, 0, 4 * self.rnn_size)
-        sigmoid_chunk = F.sigmoid(sigmoid_chunk)
+        sigmoid_chunk = torch.sigmoid(sigmoid_chunk)
         in_gate = sigmoid_chunk.narrow(1, 0, self.rnn_size)
         forget_gate = sigmoid_chunk.narrow(1, self.rnn_size, self.rnn_size)
         out_gate = sigmoid_chunk.narrow(1, self.rnn_size * 2, self.rnn_size)
@@ -197,8 +199,8 @@ class Att2in2Core(nn.Module):
             in_transform.narrow(1, 0, self.rnn_size),
             in_transform.narrow(1, self.rnn_size, self.rnn_size))
         next_c = forget_gate * state[1][-1] + in_gate * in_transform
-        next_h = out_gate * F.tanh(next_c)
-        fake_box = s_gate * F.tanh(next_c)
+        next_h = out_gate * torch.tanh(next_c)
+        fake_box = s_gate * torch.tanh(next_c)
 
         output = self.dropout1(next_h)
         fake_box = self.dropout2(fake_box)
@@ -243,8 +245,9 @@ class CascadeCore(nn.Module):
         self.fg_emb.requires_grad=False
 
         # setting the fg mask for the cascadeCore.
-        self.fg_mask = Parameter(opt.fg_mask)
-        self.fg_mask.requires_grad=False
+        # print(opt.fg_mask)
+        self.fg_mask = Parameter(opt.fg_mask, requires_grad=False)
+        # self.fg_mask.requires_grad=False
         self.min_value = -1e8
         self.beta = opt.beta
 
@@ -269,6 +272,7 @@ class CascadeCore(nn.Module):
         fg_score = torch.mm(fg_out.view(-1,300), self.fg_emb.t()).view(seq_batch_size, -1, self.fg_size+1)
 
         fg_mask = self.fg_mask[fg_idx]
+        fg_mask=fg_mask.to(torch.bool)
         fg_score.masked_fill_(fg_mask.view_as(fg_score), self.min_value)
         fg_logprob = F.log_softmax(self.beta * fg_score, dim=2)
 

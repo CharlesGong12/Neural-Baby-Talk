@@ -3,30 +3,30 @@ import argparse
 def parse_opt():
     parser = argparse.ArgumentParser()
     # # Data input settings
-    parser.add_argument('--path_opt', type=str, default='cfgs/coco.yml',
+    # NOTE!!! yml file is used to set the default value of the arguments!!!!NOTE!!!
+    parser.add_argument('--path_opt', type=str, default='cfgs/noc_coco_res101.yml',
                      help='')    
     parser.add_argument('--dataset', type=str, default='coco',
                      help='')    
-    parser.add_argument('--input_json', type=str, default='data/coco/cap_coco.json',
+    parser.add_argument('--input_json', type=str, default='/root/NeuralBabyTalk/data/noc_coco/cap_coco.json',
                     help='path to the json file containing additional info and vocab')
-    parser.add_argument('--input_dic', type=str, default='data/coco/dic_coco.json',
+    parser.add_argument('--input_dic', type=str, default='/root/NeuralBabyTalk/data/noc_coco/dic_coco.json',
                     help='path to the json containing the preprocessed dataset')
-    parser.add_argument('--image_path', type=str, default='/srv/share/datasets/coco/images',
+    parser.add_argument('--image_path', type=str, default='/root/NeuralBabyTalk/data/noc_coco',
                     help='path to the h5file containing the image data') 
-    parser.add_argument('--proposal_h5', type=str, default='data/coco/coco_detection.h5',
+    parser.add_argument('--proposal_h5', type=str, default='/root/NeuralBabyTalk/data/coco/coco_detection.h5',
                     help='path to the json containing the detection result.') 
     parser.add_argument('--cnn_backend', type=str, default='res101',
                     help='res101 or vgg16') 
-    parser.add_argument('--data_path', type=str, default='',
+    parser.add_argument('--data_path', type=str, default='/root/NeuralBabyTalk/data',
                      help='')   
 
     parser.add_argument('--decode_noc', type=bool, default=True,
                     help='decoding option: normal | noc')
     parser.add_argument('--att_model', type=str, default='topdown',
                     help='different attention model, now supporting topdown | att2in2')
-    parser.add_argument('--num_workers', dest='num_workers',
-                    help='number of worker to load data',
-                    default=10, type=int)
+    parser.add_argument('--num_workers', dest='num_workers',help='number of worker to load data',
+                    default=14, type=int)
     parser.add_argument('--cuda', type=bool, default=True,
                     help='whether use cuda')
     parser.add_argument('--mGPUs', type=bool, default=False,
@@ -37,7 +37,7 @@ def parse_opt():
     # Model settings
     parser.add_argument('--rnn_size', type=int, default=1024,
                     help='size of the rnn in number of hidden nodes in each layer')
-    parser.add_argument('--num_layers', type=int, default=1,
+    parser.add_argument('--num_layers', type=int, default=2,
                     help='number of layers in the RNN')
     parser.add_argument('--rnn_type', type=str, default='lstm',
                     help='rnn, gru, or lstm')
@@ -55,11 +55,11 @@ def parse_opt():
                     help='image random crop size')
 
     # Optimization: General
-    parser.add_argument('--max_epochs', type=int, default=30,
+    parser.add_argument('--max_epochs', type=int, default=20,
                     help='number of epochs')
-    parser.add_argument('--batch_size', type=int, default=10,
+    parser.add_argument('--batch_size', type=int, default=32,
                     help='minibatch size')
-    parser.add_argument('--grad_clip', type=float, default=0.1, #5.,
+    parser.add_argument('--grad_clip', type=float, default=1,
                     help='clip gradients at this value')
     parser.add_argument('--drop_prob_lm', type=float, default=0.5,
                     help='strength of dropout in the Language Model RNN')
@@ -98,13 +98,13 @@ def parse_opt():
                     help='beta used for adam')
     parser.add_argument('--optim_epsilon', type=float, default=1e-8,
                     help='epsilon that goes into denominator for smoothing')
-    parser.add_argument('--weight_decay', type=float, default=0,
+    parser.add_argument('--weight_decay', type=float, default=6e-5,
                     help='weight_decay')
 
     # Optimization: for the CNN
-    parser.add_argument('--finetune_cnn', action='store_true',
+    parser.add_argument('--finetune_cnn', action='store_true',default=None,
                     help='finetune CNN')
-    parser.add_argument('--fixed_block', type=float, default=1,
+    parser.add_argument('--fixed_block', type=float, default=4,
                     help='fixed cnn block when training. [0-4] \
                             0:finetune all block, 4: fix all block')
     parser.add_argument('--cnn_optim', type=str, default='adam',
@@ -115,7 +115,7 @@ def parse_opt():
                     help='beta used for adam')
     parser.add_argument('--cnn_learning_rate', type=float, default=1e-5,
                     help='cnn learning rate')
-    parser.add_argument('--cnn_weight_decay', type=float, default=0,
+    parser.add_argument('--cnn_weight_decay', type=float, default=2e-5,
                     help='weight_decay')
     # set training session
     parser.add_argument('--start_from', type=str, default=None,
@@ -130,13 +130,13 @@ def parse_opt():
     # Evaluation/Checkpointing
     parser.add_argument('--cider_df', type=str, default='corpus',
                     help='')
-    parser.add_argument('--val_split', type=str, default='test',
+    parser.add_argument('--val_split', type=str, default='val',
                     help='')
     parser.add_argument('--inference_only', type=bool, default=False,
                     help='')
     parser.add_argument('--val_images_use', type=int, default=5000,
                     help='how many images to use when periodically evaluating the validation loss? (-1 = all)')
-    parser.add_argument('--val_every_epoch', type=int, default=3,
+    parser.add_argument('--val_every_epoch', type=int, default=1,
                     help='how many images to use when periodically evaluating the validation loss? (-1 = all)')
     parser.add_argument('--checkpoint_path', type=str, default='save',
                     help='directory to store checkpointed models')

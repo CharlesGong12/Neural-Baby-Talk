@@ -3,7 +3,7 @@ import re
 import sys
 
 # from python_utils import *
-sys.path.append('tools/coco-caption/')
+sys.path.append('tools/coco-caption')
 COCO_EVAL_PATH = '.tools/coco-caption/pycocotools'
 sys.path.insert(0, COCO_EVAL_PATH)
 from pycocoevalcap.bleu.bleu import Bleu
@@ -46,15 +46,17 @@ class DCCScorer(COCOEvalCap):
     gts = tokenizer.tokenize(gts)
     res = tokenizer.tokenize(res)
     scorers = [
-        (Bleu(4), ["Bleu_1", "Bleu_2", "Bleu_3", "Bleu_4"]),
+        # (Bleu(4), ["Bleu_1", "Bleu_2", "Bleu_3", "Bleu_4"]),
         (Meteor(), "METEOR"),
-        (Rouge(), "ROUGE_L"),
-        (Cider(df='noc_test_freq'), "CIDEr"),
+        # (Rouge(), "ROUGE_L"),
+        (Cider(df='corpus'), "CIDEr"),
         (Spice(), "SPICE")
     ]
     score_dict = {}
     for scorer, method in scorers:
       print('computing %s score...' % (scorer.method()))
+      ##############################################################################
+      #print(gts,res)
       score, scores = scorer.compute_score(gts, res)
       if type(method) == list:
         for sc, scs, m in zip(score, scores, method):
@@ -111,13 +113,15 @@ def score_dcc(gt_template_novel, gt_template_train,
     gt_ids_novel = [c['image_id'] for c in gt_json_novel['annotations']]
     gt_ids_train = [c['image_id'] for c in gt_json_train['annotations']]
     gen = []
+    # print('coco_eval,generated_sentences: ',generated_sentences)
     for c in generated_sentences:
       if c['image_id'] in gt_ids_novel:
         gen.append(c)
-
+    # print('coco_eval,gen: ',gen)
     json.dump(gen, open(cache_path, 'w'))
     # save_json(gen, 'tmp_gen.json')
     coco = COCO(gt_file)
+    # print(gen, cache_path)
     generation_coco = coco.loadRes(cache_path)
     dcc_evaluator = DCCScorer(coco, generation_coco, 'noc_test_freq')
     score_dict = dcc_evaluator.get_dcc_scores()

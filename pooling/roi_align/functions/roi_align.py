@@ -11,7 +11,7 @@ class RoIAlignFunction(Function):
         self.spatial_scale = float(spatial_scale)
         self.rois = None
         self.feature_size = None
-
+    @staticmethod
     def forward(self, features, rois):
         self.rois = rois
         self.feature_size = features.size()
@@ -31,7 +31,7 @@ class RoIAlignFunction(Function):
                                         self.spatial_scale, features,
                                         rois, output)
 #            raise NotImplementedError
-
+        
         return output
 
     def backward(self, grad_output):

@@ -9,7 +9,7 @@ example element in this list would look like
 This script reads this json, does some basic preprocessing on the captions
 (e.g. lowercase, etc.), creates a special UNK token, and encodes everything to arrays
 
-Output: a json file and an hdf5 file
+Output: a json file and an hdf5 file (But it seems that the hdf5 file is not used in the code.)
 The hdf5 file contains several fields:
 /images is (N,3,256,256) uint8 array of raw image data in RGB format
 /labels is (M,max_length) uint32 array of encoded labels, zero padded

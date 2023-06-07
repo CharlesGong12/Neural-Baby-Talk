@@ -24,6 +24,7 @@ class RoIAlignAvg(Module):
         self.spatial_scale = float(spatial_scale)
 
     def forward(self, features, rois):
+        # assert features.requires_grad
         x =  RoIAlignFunction(self.aligned_height+1, self.aligned_width+1,
                                 self.spatial_scale)(features, rois)
         return avg_pool2d(x, kernel_size=2, stride=1)

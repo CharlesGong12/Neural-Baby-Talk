@@ -209,6 +209,9 @@ def bbox_overlaps_batch(anchors, gt_boxes):
         overlaps = iw * ih / ua
 
         # mask the overlap here.
+        # convert into bool
+        gt_area_zero = gt_area_zero.to(torch.bool)
+        anchors_area_zero = anchors_area_zero.to(torch.bool)
         overlaps.masked_fill_(gt_area_zero.view(batch_size, 1, K).expand(batch_size, N, K), 0)
         overlaps.masked_fill_(anchors_area_zero.view(batch_size, N, 1).expand(batch_size, N, K), -1)
     
@@ -249,6 +252,8 @@ def bbox_overlaps_batch(anchors, gt_boxes):
         overlaps = iw * ih / ua
 
         # mask the overlap here.
+        gt_area_zero = gt_area_zero.to(torch.bool)
+        anchors_area_zero = anchors_area_zero.to(torch.bool)
         overlaps.masked_fill_(gt_area_zero.view(batch_size, 1, K).expand(batch_size, N, K), 0)
         overlaps.masked_fill_(anchors_area_zero.view(batch_size, N, 1).expand(batch_size, N, K), -1)
     else:

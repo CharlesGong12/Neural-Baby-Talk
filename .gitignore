@@ -19,6 +19,7 @@ env/
 env3/
 build/
 data/
+!data/imagenet_weights
 logs/
 develop-eggs/
 dist/
@@ -80,3 +81,13 @@ ENV/
 .idea
 media/
 db.sqlite3
+
+eval_results/
+misc/__pycache__
+pooling/
+dataset/
+prepro/stanford-corenlp-full-2017-06-09
+prepro/stanford-corenlp-full-2017-06-09.zip
+Dockerfile
+noc_test_freq.p
+demo/

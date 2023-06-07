@@ -15,6 +15,7 @@ from pooling.roi_align.modules.roi_align import RoIAlignAvg
 # from roi_crop.modules.gridgen import _AffineGridGen
 from torch.autograd import Variable
 import math
+import torchvision
 
 import numpy as np
 # from misc.adaptiveLSTMCell import adaptiveLSTMCell
@@ -87,7 +88,8 @@ class AttModel(CaptionModel):
         self.ctx2pool = nn.Linear(self.rnn_size, self.att_hid_size)
 
         self.logit = nn.Linear(self.rnn_size, self.vocab_size + 1)
-        self.roi_align = RoIAlignAvg(1, 1, 1.0 / self.stride)
+        self.roi_align=torchvision.ops.RoIAlign(output_size=(1,1), spatial_scale=1.0/self.stride, sampling_ratio=-1)
+        # self.roi_align = RoIAlignAvg(1, 1, 1.0 / self.stride)
 
         #self.grid_size = 1
         #self.roi_crop = _RoICrop()
@@ -122,12 +124,12 @@ class AttModel(CaptionModel):
 
 
     def forward(self, img, seq, gt_seq, num, ppls, gt_boxes, mask_boxes, opt, eval_opt = {}):
-        if opt == 'MLE':
+        if opt == 'MLE':    # Maximum Likelihood Estimation. We use this one
             return self._forward(img, seq, ppls, gt_boxes, mask_boxes, num)
-        elif opt == 'RL':
+        elif opt == 'RL':   # Reinforce Learning. But it seems that the cider_score is None
             # with torch.no_grad():
-            greedy_result = self._sample(Variable(img.data, volatile=True), Variable(ppls.data, volatile=True), \
-                                    Variable(num.data, volatile=True), {'sample_max':1, 'beam_size':1, 'inference_mode' : False})
+            greedy_result = self._sample(Variable(img.data, requires_grad=False), Variable(ppls.data, requires_grad=False), \
+                                    Variable(num.data, requires_grad=False), {'sample_max':1, 'beam_size':1, 'inference_mode' : False})
 
             gen_result = self._sample(img, ppls, num, {'sample_max':0, 'beam_size':1, 'inference_mode' : False})
             
@@ -148,6 +150,29 @@ class AttModel(CaptionModel):
                 Variable(weight.new(self.num_layers, bsz, self.rnn_size).zero_()))
 
     def _forward(self, img, seq, ppls, gt_boxes, mask_boxes, num):
+        '''
+        Here's a breakdown of the steps performed in the _forward function:
+        Reshape the seq tensor and create a copy of it for later use.
+        Initialize some variables and containers to store intermediate outputs.
+        If the model is in training mode and the scheduled sampling probability (ss_prob) is greater than 0, perform scheduled sampling. 
+        This involves sampling from the previous predicted distributions to determine the next input token (it). 
+        If scheduled sampling is not performed, use the ground truth token from seq as the input.
+        Calculate the overlap between the region of interest (ROI) bounding boxes (ppls) and the ground truth bounding boxes (gt_boxes).
+        Iterate over the sequence length and process each time step:
+            a. Prepare the input features for the core of the model by extracting convolutional and ROI features from the image.
+            b. Apply feature embeddings to the extracted features.
+            c. Project the attention features to reduce memory and computation.
+            d. Calculate the ROI labels using the bounding box targets, overlap scores, and sequence information.
+            e. Pass the inputs through the core of the model, which includes an LSTM and attention mechanism, to generate outputs and detection probabilities.
+            f. Collect the outputs and detection probabilities for each time step.
+        Concatenate the collected outputs and detection probabilities.
+        Apply log softmax to the detection probabilities.
+        Apply log softmax to the linearly transformed outputs.
+        Calculate the language model (LM) loss using the transformed outputs, the visibility probabilities, and the updated sequence.
+        Perform cascade object recognition (CCR) by processing the detected object indices and the ROI features.
+        Calculate the bounding box (BN) and foreground (FG) losses using the CCR outputs and the updated sequence.
+        Return the calculated LM, BN, and FG losses.
+        '''
 
         seq = seq.view(-1, seq.size(2), seq.size(3))
         seq_update = seq.data.clone()
@@ -158,6 +183,7 @@ class AttModel(CaptionModel):
         # constructing the mask.
 
         pnt_mask = mask_boxes.data.new(batch_size, rois_num+1).byte().fill_(1)
+        num=num.type(torch.int32)
         for i in range(batch_size):
             pnt_mask[i,:num.data[i,1]+1] = 0
         pnt_mask = Variable(pnt_mask)
@@ -171,7 +197,7 @@ class AttModel(CaptionModel):
             conv_feats, fc_feats = self.cnn(img)
         else:
             # with torch.no_grad():
-            conv_feats, fc_feats = self.cnn(Variable(img.data, volatile=True))
+            conv_feats, fc_feats = self.cnn(Variable(img.data, requires_grad=False))
             conv_feats = Variable(conv_feats.data)
             fc_feats = Variable(fc_feats.data)
         # pooling the conv_feats
@@ -186,11 +212,12 @@ class AttModel(CaptionModel):
         loc_input[:,:,:4] = ppls.data[:,:,:4] / self.image_crop_size
         loc_input[:,:,4] = ppls.data[:,:,5]
         loc_feats = self.loc_fc(Variable(loc_input))
-
+        # use ppls, the proposal generated by faster-rcnn to predict the label.
         label_input = seq.data.new(batch_size, rois_num)
         label_input[:,:] = ppls.data[:,:,4]
         label_feat = self.det_fc(Variable(label_input))
 
+        # combine the conv_features and the detection features
         # pool_feats = pool_feats + label_feat
         pool_feats = torch.cat((pool_feats, loc_feats, label_feat), 2)
         # transpose the conv_feats
@@ -303,7 +330,7 @@ class AttModel(CaptionModel):
             conv_feats, fc_feats = self.cnn(img)
         else:
             # with torch.no_grad():
-            conv_feats, fc_feats = self.cnn(Variable(img.data, volatile=True))
+            conv_feats, fc_feats = self.cnn(Variable(img.data, requires_grad=False))
             conv_feats = Variable(conv_feats.data)
             fc_feats = Variable(fc_feats.data)
 
@@ -342,6 +369,8 @@ class AttModel(CaptionModel):
 
         # constructing the mask.
         pnt_mask = ppls.data.new(batch_size, rois_num+1).byte().fill_(1)
+        num=num.type(torch.int32)
+        # print(num.data)
         for i in range(batch_size):
             pnt_mask[i,:num.data[i,1]+1] = 0
         pnt_mask = Variable(pnt_mask)
@@ -517,7 +546,7 @@ class AttModel(CaptionModel):
             conv_feats, fc_feats = self.cnn(img)
         else:
             # with torch.no_grad():
-            conv_feats, fc_feats = self.cnn(Variable(img.data, volatile=True))
+            conv_feats, fc_feats = self.cnn(Variable(img.data, requires_grad=False))
             conv_feats = Variable(conv_feats.data)
             fc_feats = Variable(fc_feats.data)
 
@@ -554,8 +583,9 @@ class AttModel(CaptionModel):
 
         # constructing the mask.
         pnt_mask = ppls.data.new(batch_size, rois_num+1).byte().fill_(1)
+        num=num.type(torch.int32)
         for i in range(batch_size):
-            pnt_mask[i,:num.data[i,1]+1] = 0
+            pnt_mask[i,:num[i,1]+1] = 0
         pnt_mask = Variable(pnt_mask)
 
         vis_offset = (torch.arange(0, beam_size)*rois_num).view(beam_size).type_as(ppls.data).long()
