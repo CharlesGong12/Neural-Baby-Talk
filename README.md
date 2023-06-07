@@ -28,6 +28,7 @@ Evaluation:
 
 ### Data Preparation
 Head to `data/README.md`, and prepare the data for training and evaluation.
+Also, you need to download pretrained weights of resnet101 into `data/imagenet_weights/resnet101.pth`.
 
 ### Novel Object Captioning
 
